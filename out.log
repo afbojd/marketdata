@@ -1,0 +1,93 @@
+CTLSocketLink::ThreadCheckFunc exit.reqHqroot:	<Result>
+<DataResult Period="0">
+<Record>
+<Item Id="5" H="100" Market="17">
+<Value>600000</Value>
+</Item>
+<Item Id="10">
+<Value>8.89</Value>
+</Item>
+<Item Id="24">
+<Value>8.90</Value>
+</Item>
+<Item Id="25">
+<Value>111731.00</Value>
+</Item>
+<Item Id="26">
+<Value>8.89</Value>
+</Item>
+<Item Id="27">
+<Value>73177.00</Value>
+</Item>
+<Item Id="28">
+<Value>8.88</Value>
+</Item>
+<Item Id="29">
+<Value>1087600.00</Value>
+</Item>
+<Item Id="30">
+<Value>8.91</Value>
+</Item>
+<Item Id="31">
+<Value>226972.00</Value>
+</Item>
+<Item Id="32">
+<Value>8.92</Value>
+</Item>
+<Item Id="33">
+<Value>282437.00</Value>
+</Item>
+<Item Id="34">
+<Value>8.93</Value>
+</Item>
+<Item Id="35">
+<Value>76900.00</Value>
+</Item>
+</Record>
+<Record>
+<Item Id="5" H="100" Market="17">
+<Value>600500</Value>
+</Item>
+<Item Id="10">
+<Value>7.20</Value>
+</Item>
+<Item Id="24">
+<Value>7.20</Value>
+</Item>
+<Item Id="25">
+<Value>7634.00</Value>
+</Item>
+<Item Id="26">
+<Value>7.19</Value>
+</Item>
+<Item Id="27">
+<Value>47159.00</Value>
+</Item>
+<Item Id="28">
+<Value>7.18</Value>
+</Item>
+<Item Id="29">
+<Value>28301.00</Value>
+</Item>
+<Item Id="30">
+<Value>7.21</Value>
+</Item>
+<Item Id="31">
+<Value>14684.00</Value>
+</Item>
+<Item Id="32">
+<Value>7.22</Value>
+</Item>
+<Item Id="33">
+<Value>15200.00</Value>
+</Item>
+<Item Id="34">
+<Value>7.23</Value>
+</Item>
+<Item Id="35">
+<Value>20096.00</Value>
+</Item>
+</Record>
+</DataResult>
+</Result>
+
