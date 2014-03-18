@@ -5,7 +5,8 @@
 --
 -- @creation time 2014-03-17
 -------------------------------------------------------------------------------
-module('run', package.seeall);
+
+package.cpath = ".\\?.dll"
 
 local quoteget = require("util.quoteget");
 local loger = require("util.loger");
