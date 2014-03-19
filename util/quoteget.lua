@@ -70,12 +70,16 @@ QuoteKeyRealTimeMap = {
 };
 
 --! @brief 获取指定市场的子市场信息
---! @param codeList 市场列表，如"16", "16,30"
+--! @param codeList 市场列表，如"16", "16;30"
 --! @return 返回获取的所有子市场信息
 --! @retval nil 失败
 --! @retval table { market = {name, items = {{id, name}, ... } ... }
 function GetMarketInfo(codeList)
+    loger.Debug("[util.quoteget.GetMarketInfo]#codeList=" .. #codeList);
+
     local req = "Method=Market&CodeList=" .. codeList;
+
+    loger.Debug("[util.quoteget.GetMarketInfo]req=" .. req);
     local response, msg = hexin.util.httpRequest(HQURL, req);
 
     if type(response) ~= 'string' then
@@ -88,6 +92,8 @@ function GetMarketInfo(codeList)
         loger.Error("[util.quoteget.GetMarketInfo]response error,response=" .. tostring(response));
         return nil;
     end
+
+    loger.Debug("[util.quoteget.GetMarketInfo]root=" .. root:output());
 
     local marketList = {};
 
@@ -110,17 +116,19 @@ function GetMarketInfo(codeList)
         end
     end
 
-    loger.Debug("[util.quoteget.GetMarketInfo]marketList=" .. loger.GenTableStr(marketList));
+    loger.Debug("[util.quoteget.GetMarketInfo]#marketList=" .. #marketList);
     return marketList;
 end
 
 
 --! @brief 获取指定市场的证券信息，包括证券代码、证券名称、拼音简码
---! @param codeList 市场列表，如"16", "16,30"
+--! @param codeList 市场列表，如"16", "16;30"
 --! @return 返回获取的所有证券信息
 --! @retval nil 失败
 --! @retval table {market ={name, stocks = {{code, name, jianpin} ... } ... }
 function GetStockByMarket(marketList)
+    loger.Info("[util.quoteget.GetStockByMarket]marketList=" .. marketList);
+
     local req = "Method=Market&CodeList=" .. marketList .. "&Append=P";
     local response, msg = hexin.util.httpRequest(HQURL, req);
 
@@ -140,6 +148,7 @@ function GetStockByMarket(marketList)
     local stockList = {};
 
     local marketId;
+    local stockCount = 0;
     for pyjcResult in root:foreach_child() do
         local record = pyjcResult:get_child("Record");
         local stocks = {};
@@ -172,11 +181,11 @@ function GetStockByMarket(marketList)
                 ["name"] = name,
                 ["jianpin"] = jianpin,
             };
-
+            stockCount = stockCount + 1;
         end
     end
 
-    loger.Debug("[util.quoteget.GetStockByMarket]stockList=" .. loger.GenTableStr(stockList));
+    loger.Debug("[util.quoteget.GetStockByMarket]#stockList=" .. #stockList .. ",stockCount=" .. stockCount);
     return stockList;
 end
 
