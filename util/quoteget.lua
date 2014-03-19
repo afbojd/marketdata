@@ -23,10 +23,17 @@ local loger = require("util.loger");
 local reqbody = "Method=Market&CodeList=16;32&Append=P";
 local HQURL = "http://122.224.215.36/hexin";
 
+Market_SH = 16;
+Market_SZ = 32;
+Market_QH = 64;
+
 QuoteKey_Time = 1;
 QuoteKey_Code = 5;
-
+QuoteKey_OpenPrice = 7;
+QuoteKey_HighPrice = 8;
+QuoteKey_LowPrice = 9;
 QuoteKey_LatestePrice = 10;
+QuoteKey_ClosePrice = 11;
 QuoteKey_Volnum = 13;
 QuoteKey_BuyPrice1 = 24;
 QuoteKey_BuyCount1 = 25;
@@ -42,7 +49,11 @@ QuoteKey_SalePrice3 = 34;
 QuoteKey_SaleCount3 = 35;
 
 QuoteKeyRealTimeMap = {
+    [QuoteKey_OpenPrice] = "open_price",
+    [QuoteKey_HighPrice] = "high_price",
+    [QuoteKey_LowPrice] = "low_price",
     [QuoteKey_LatestePrice] = "lateste_price",
+    [QuoteKey_ClosePrice] = "close_price",
     [QuoteKey_Volnum] = "volnum",
     [QuoteKey_BuyPrice1] = "buy_price1",
     [QuoteKey_BuyCount1] = "buy_count1",
@@ -62,7 +73,7 @@ QuoteKeyRealTimeMap = {
 --! @param codeList 市场列表，如"16", "16,30"
 --! @return 返回获取的所有子市场信息
 --! @retval nil 失败
---! @retval table {{ market, name, items = {{id, name} ... } ... }
+--! @retval table { market = {name, items = {{id, name}, ... } ... }
 function GetMarketInfo(codeList)
     local req = "Method=Market&CodeList=" .. codeList;
     local response, msg = hexin.util.httpRequest(HQURL, req);
@@ -80,13 +91,15 @@ function GetMarketInfo(codeList)
 
     local marketList = {};
 
+    local marketId;
     for market in root:foreach_child() do
         local record = market:get_child("Record");
         local items = {};
-        marketList[#marketList + 1] = {
-            ["market"] = tonumber(record:get_attr("Market"));
-            ["name"] = record:get_attr("Name");
-            ["items"] = items;
+
+        marketId = tonumber(record:get_attr("Market"));
+        marketList[marketId] = {
+            ["name"] = record:get_attr("Name"),
+            ["items"] = items,
         };
 
         for item in record:foreach_child() do
@@ -106,7 +119,7 @@ end
 --! @param codeList 市场列表，如"16", "16,30"
 --! @return 返回获取的所有证券信息
 --! @retval nil 失败
---! @retval table {{ market, name, stocks = {{code, name, jianpin} ... } ... }
+--! @retval table {market ={name, stocks = {{code, name, jianpin} ... } ... }
 function GetStockByMarket(marketList)
     local req = "Method=Market&CodeList=" .. marketList .. "&Append=P";
     local response, msg = hexin.util.httpRequest(HQURL, req);
@@ -126,11 +139,13 @@ function GetStockByMarket(marketList)
 
     local stockList = {};
 
+    local marketId;
     for pyjcResult in root:foreach_child() do
         local record = pyjcResult:get_child("Record");
         local stocks = {};
-        stockList[#stockList + 1] = {
-            ["market"] = tonumber(record:get_attr("Market"));
+        marketId = tonumber(record:get_attr("Market"));
+
+        stockList[marketId] = {
             ["name"] = record:get_attr("Name");
             ["stocks"] = stocks;
         };
@@ -170,7 +185,7 @@ end
 --! @param codeList 证券列表，{{code, market}, ... }
 --! @return 返回获取的所有证券行情信息
 --! @retval nil 失败
---! @retval table {{code, market, lateste_price, buy_price1, buy_count1, ... , sale_price3, sale_count3}, ... }
+--! @retval table {code = {market, lateste_price, buy_price1, buy_count1, ... , sale_price3, sale_count3}, ... }
 function GetRealTimeQuote(codeList)
     local codestr = "";
 
@@ -200,7 +215,7 @@ function GetRealTimeQuote(codeList)
     end
 
     local quoteList = {};
-    local id, value, marketId, quote;
+    local id, value, marketId, quote, code;
     for dataResult in root:foreach_child() do
         for record in dataResult:foreach_child() do
             quote = {};
@@ -210,12 +225,12 @@ function GetRealTimeQuote(codeList)
 
                 quote.market = tonumber(item:get_attr("Market"));
                 if id == QuoteKey_Code then
-                    quote.code = value;
+                    code = value;
                 else
-                    quote[QuoteKeyRealTimeMap[id]] = value;
+                    quote[QuoteKeyRealTimeMap[id]] = tonumber(value);
                 end
             end
-            quoteList[#quoteList + 1] = quote;
+            quoteList[code] = quote;
         end
     end
 
@@ -228,7 +243,7 @@ end
 --! @param codeList 证券列表，{{code, market}, ... }
 --! @return 返回获取的当天所有成交明细
 --! @retval nil 失败
---! @retval table {{code, market, deal_detail = {{time, lateste_price, volnum}, ...}}, ... }，其中时间time格式为HHMMSS的5/6位整数
+--! @retval table {code = {market, deal_detail = {{time, lateste_price, volnum}, ...}}, ... }，其中时间time格式为HHMMSS的5/6位整数
 function GetDealDetail(codeList)
     local codestr = "";
 
@@ -258,16 +273,17 @@ function GetDealDetail(codeList)
     end
 
     local quoteList = {};
-    local id, value, marketId, quote, timeTab, dealDetail, dealItem;
+    local id, value, marketId, quote, timeTab, dealDetail, dealItem, code, codeIndex;
     for dataResult in root:foreach_child() do
         codeIndex = dataResult:get_child("CodeIndex");
         dealDetail = {};
+        code = codeIndex:get_attr("Code");
+
         quote = {
-            code = codeIndex:get_attr("Code"),
             market = tonumber(codeIndex:get_attr("Market")),
             deal_detail = dealDetail,
         };
-        quoteList[#quoteList + 1] = quote;
+        quoteList[code] = quote;
 
         for record in codeIndex:foreach_child() do
             dealItem = {};
@@ -279,7 +295,7 @@ function GetDealDetail(codeList)
                     timeTab = os.date("*t", tonumber(value));
                     dealItem.time = timeTab.hour * 10000 + timeTab.min * 100 + timeTab.sec;
                 else
-                    dealItem[QuoteKeyRealTimeMap[id]] = value;
+                    dealItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
                 end
                 
             end
@@ -292,12 +308,167 @@ function GetDealDetail(codeList)
 end
 
 
--- GetDealDetail({
+--! @brief 获取指定证券的分时行情，包括最新价和成交量
+--! @param codeList 证券列表，{{code, market}, ... }
+--! @return 返回获取的当天所有分时行情
+--! @retval nil 失败
+--! @retval table {code = {market, trends = {{time, lateste_price, volnum}, ...}}, ... }，其中时间time格式为HHMMSS的5/6位整数
+function GetMinuteTrend(codeList)
+    local codestr = "";
+
+    local item;
+    if #codeList >= 1 then
+        item = codeList[1];
+        codestr = codestr .. item.market .. "(" .. item.code .. ")";
+    end
+
+    for idx = 2, #codeList do
+        item = codeList[idx];
+        codestr = ";" .. codestr .. item.market .. "(" .. item.code .. ")";
+    end
+
+    local req = "Method=Quote&datetime=8192(0-0)&datatype=10,13&codelist=" .. codestr;
+    local response, msg = hexin.util.httpRequest(HQURL, req);
+
+    if type(response) ~= 'string' then
+        loger.Error("[util.quoteget.GetMinuteTrend]http faild,msg=" .. tostring(msg));
+        return nil;
+    end
+
+    local root = hexin.xml.parse_string(response);
+    if type(root) ~= "table" then
+        loger.Error("[util.quoteget.GetMinuteTrend]response error,response=" .. tostring(response));
+        return nil;
+    end
+
+    local trendList = {};
+    local id, value, marketId, quote, timeTab, trends, dealItem, code, codeIndex;
+    for dataResult in root:foreach_child() do
+        codeIndex = dataResult:get_child("CodeIndex");
+        trends = {};
+
+        code = codeIndex:get_attr("Code");
+
+        quote = {
+            ["market"] = tonumber(codeIndex:get_attr("Market")),
+            ["trends"] = trends,
+        };
+        trendList[code] = quote;
+
+        for record in codeIndex:foreach_child() do
+            dealItem = {};
+            for item in record:foreach_child() do
+                id = tonumber(item:get_attr("Id"));
+                value = item:get_child("Value"):get_text();
+
+                if id == QuoteKey_Time then
+                    dealItem.time = value % 1000000;
+                else
+                    dealItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
+                end
+                
+            end
+            trends[#trends + 1] = dealItem;
+        end
+    end
+
+    loger.Debug("[util.quoteget.GetMinuteTrend]trendList=" .. loger.GenTableStr(trendList));
+    return trendList;
+end
+
+
+--! @brief 获取指定证券的日行情信息，包括开盘价、收盘价、最高价、最低价、成交量
+--! @param codeList 证券列表，{{code, market}, ... }
+--! @param begTime 开始时间
+--! @param endTime 结束时间
+--! @return 返回获取的当天所有分时行情
+--! @retval nil 失败
+--! @retval table {code = {market, trends = {{time, open_price, close_price, high_price, low_price, volnum}, ...}}, ... }，
+--      其中时间time格式为HHMMSS的5/6位整数
+function GetDayTrend(codeList, begTime, endTime)
+    local codestr = "";
+    begTime = begTime or 0;
+    endTime = endTime or 0;
+
+    local item;
+    if #codeList >= 1 then
+        item = codeList[1];
+        codestr = codestr .. item.market .. "(" .. item.code .. ")";
+    end
+
+    for idx = 2, #codeList do
+        item = codeList[idx];
+        codestr = ";" .. codestr .. item.market .. "(" .. item.code .. ")";
+    end
+
+    local req = "Method=Quote&datetime=16384(" .. begTime .. "-" .. endTime .. ")&datatype=7,8,9,11,13&codelist=" .. codestr;
+    local response, msg = hexin.util.httpRequest(HQURL, req);
+
+    if type(response) ~= 'string' then
+        loger.Error("[util.quoteget.GetDayTrend]http faild,msg=" .. tostring(msg));
+        return nil;
+    end
+
+    local root = hexin.xml.parse_string(response);
+    if type(root) ~= "table" then
+        loger.Error("[util.quoteget.GetDayTrend]response error,response=" .. tostring(response));
+        return nil;
+    end
+
+    local trendList = {};
+    local id, value, marketId, quote, timeTab, trends, dealItem, code, codeIndex;
+    for dataResult in root:foreach_child() do
+        codeIndex = dataResult:get_child("CodeIndex");
+
+        if codeIndex then
+            code = codeIndex:get_attr("Code");
+            marketId = tonumber(codeIndex:get_attr("Market"));
+        else
+            codeIndex = dataResult;
+        end
+
+        for record in codeIndex:foreach_child() do
+            trendItem = {};
+            for item in record:foreach_child() do
+                id = tonumber(item:get_attr("Id"));
+
+                value = item:get_child("Value"):get_text();
+
+                if id == QuoteKey_Time then
+                    trendItem["time"] = tonumber(value);
+                elseif id == QuoteKey_Code then
+                    code = value;
+                    marketId = tonumber(item:get_attr("Market"));
+                else
+                    trendItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
+                end
+                
+            end
+
+            if not trendList[code] then
+                trendList[code] = {
+                    market = marketId,
+                    trends = {},
+                };
+            end
+            trends = trendList[code].trends;
+            trends[#trends + 1] = trendItem;
+        end
+    end
+
+    loger.Debug("[util.quoteget.GetDayTrend]trendList=" .. loger.GenTableStr(trendList));
+    return trendList;
+end
+
+-- GetDayTrend({
 --     {
 --         code = "600000",
 --         market = 17,
 --     },
-
+--     {
+--         code = "600500",
+--         market = 17,
+--     },
 --     });
 
 -- local root = hexin.xml.parse_string(ret);
@@ -312,17 +483,14 @@ end
 
 
 
-local reqHq = "method=quote&datetime=4096(0-0)&datatype=10,24,25,26,27,28,29,30,31,32,33,34,35&codelist=17(600000);17(600500)";
-local reqHq = "method=quote&datetime=16384(0-0)&datatype=7,8,11,10,13&codelist=17(600000);17(600500)";
-local ret, msg = hexin.util.httpRequest(HQURL, reqHq);
-if type(ret) ~= 'string' then
-    print("[quote]" .. tostring(msg));
-end
-local root = hexin.xml.parse_string(ret);
-print("reqHqroot:", root:output());
+-- local reqHq = "method=quote&datetime=16384(-2-1)&datatype=7,8,13&codelist=17(600000)";
+-- local ret, msg = hexin.util.httpRequest(HQURL, reqHq);
+-- if type(ret) ~= 'string' then
+--     print("[quote]" .. tostring(msg));
+-- end
+-- local root = hexin.xml.parse_string(ret);
+-- print("reqHqroot:", root:output());
 
--- temp = os.date("*t", 1395105243)
--- print(loger.GenTableStr(temp))
 
 -- local reqHq = "method=quote&datetime=16384(-100-0)&datatype=OPEN,CLOSE&codelist=17(600000)";
 -- local ret, msg = hexin.util.httpRequest(HQURL, reqHq);

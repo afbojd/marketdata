@@ -10,4 +10,6 @@ package.cpath = ".\\?.dll"
 
 local quoteget = require("util.quoteget");
 local loger = require("util.loger");
+local dbwrite = require("util.dbwrite");
 
+dbwrite.InitDataBase();
