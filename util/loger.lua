@@ -29,7 +29,7 @@ function GenTableStr (tbl)
 end
 
 function Debug(...)
-    print(...);
+    --print(...);
 end
 
 function Info(...)

@@ -7,7 +7,7 @@
 ---------------------------------
 module('util.dbwrite', package.seeall);
 
-local sqlite = require("lsqlite3");
+local sqlite3 = require("lsqlite3");
 local loger = require("util.loger");
 
 local DB = _G["DB_Market"];
@@ -48,10 +48,19 @@ local DB = _G["DB_Market"];
 -- );
 
 function InitDataBase()
-    DB = sqlite.open("db\\market.db");
+    local code, msg;
+    local fileName = "db\\market.sqlite";
+    DB, code, msg = sqlite3.open(fileName);
+
+    if not DB then
+        loger.Error("[util.dbwrite.InitDataBase]create database faild.fileName=" .. fileName 
+            .. ",code=" .. tostring(code) .. ",msg=" .. tostring(msg));
+        return false;
+    end
+
     _G["DB_Market"] = DB;
 
-    DB:exec([[
+    local ret = DB:exec([[
         CREATE TABLE IF NOT EXISTS market 
             (id, name, parent);
         CREATE TABLE IF NOT EXISTS stock 
@@ -63,98 +72,154 @@ function InitDataBase()
         CREATE UNIQUE INDEX IF NOT EXISTS idx_st_pk ON stock(code, market);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_dt_pk ON daytrend(code, market, time);
     ]]);
+
+    if ret ~= sqlite3.OK then
+        loger.Error("[util.dbwrite.InitDataBase]exec sql faild.ret=" .. tostring(ret));
+        return false;
+    end
+
+    loger.Info("[util.dbwrite.InitDataBase]init database success.");
+    return true;
 end
 
 function UnintiDataBase()
     if DB then
-        DB:close();
+        local ret = DB:close();
+        if ret == sqlite3.OK then
+            loger.Info("[util.dbwrite.UnintiDataBase]close database faild.ret=" .. tostring(ret));
+        else
+            loger.Info("[util.dbwrite.UnintiDataBase]close database success.");
+        end
     end
 end
 
 
 function InsertMarket(dataList)
     loger.Debug("[util.dbwrite.InsertMarket]#dataList=" .. #dataList);
-    local sql;
-    local sqlList = {};
-    local item;
+
+    local item, ret;
+    local insertCount = 0;
+
+    local insert_stmt, msg = DB:prepare("INSERT INTO market(id, name, parent) VALUES (?, ?, ?)");
+
+    if type(insert_stmt) ~= "userdata" then
+        loger.Error("[util.dbwrite.InsertMarket]prepare sql faild.msg=" .. tostring(msg));
+        return;
+    end
+
+    DB:exec('begin');
     for idx = 1, #dataList do
         item = dataList[idx];
-        local valus = {
-            item.id,
-            "'" .. item.name .. "'",
-            item.parent,
-        };
 
-        sqlList[#sqlList + 1] = [[INSERT INTO market(id, name, parent) 
-            VALUES (]] .. table.concat(valus, ", ") .. ");";
-    end
+        ret = insert_stmt:bind_values(item.id, item.name, item.parent);
+        if ret ~= sqlite3.OK then
+            local valus = {
+                item.id,
+                "'" .. item.name .. "'",
+                item.parent,
+            };
+            loger.Error("[util.dbwrite.InsertMarket]do insert failse.ret=" .. tostring(ret)
+                .. ",INSERT INTO market(id, name, parent) VALUES (" .. table.concat(valus, ", ") .. ");" );
+        else
+            insertCount = insertCount + 1;
+        end
 
-    if #sqlList > 0 then
-        sql = table.concat(sqlList, "");
-        local ret = DB:exec(sql);
-        loger.Debug("[util.dbwrite.InsertMarket]ret=" .. tostring(ret));
+        insert_stmt:step()
+        insert_stmt:reset()
     end
-    loger.Debug("[util.dbwrite.InsertMarket]end");
+    DB:exec('commit');
+    insert_stmt:finalize();
+
+    loger.Info("[util.dbwrite.InsertMarket]end.insertCount=" .. insertCount);
+    return insertCount;
 end
 
 
 function InsertStock(dataList)
     loger.Info("[util.dbwrite.InsertStock]#dataList=" .. #dataList);
-    local sql;
-    local sqlList = {};
-    local item;
-    local inertCount = 0;
+
+    local item, ret;
+    local insertCount = 0;
+
+    local insert_stmt, msg = DB:prepare("INSERT INTO stock(code, market, name, jianpin) VALUES (?, ?, ?, ?)");
+
+    if type(insert_stmt) ~= "userdata" then
+        loger.Error("[util.dbwrite.InsertStock]prepare sql faild.msg=" .. tostring(msg));
+        return;
+    end
+
+    DB:exec('begin');
     for idx = 1, #dataList do
         item = dataList[idx];
-        local valus = {
-            "'" .. item.code .. "'",
-            item.market,
-            "'" .. item.name .. "'",
-            "'" .. "item.jianpin" .. "'",
-        };
 
-        sqlList[#sqlList + 1] = [[INSERT INTO stock(code, market, name, jianpin) VALUES (]] .. table.concat(valus, ", ") .. ");";
-
-        if #sqlList >= 10 then
-            sql = table.concat(sqlList, "");
-            loger.Debug("[util.dbwrite.InsertStock]sql.10=" .. sql);
-            local ret = DB:exec(sql);
-            loger.Debug("[util.dbwrite.InsertStock]ret=" .. tostring(ret));
-            inertCount = inertCount + #sqlList;
-            sqlList = {};
+        ret = insert_stmt:bind_values(item.code, item.market, item.name, item.jianpin);
+        if ret ~= sqlite3.OK then
+            local valus = {
+                "'" .. item.code .. "'",
+                item.market,
+                "'" .. item.name .. "'",
+                "'" .. item.jianpin .. "'",
+            };
+            loger.Error("[util.dbwrite.InsertStock]do insert failse.ret=" .. tostring(ret)
+                .. ",INSERT INTO market(id, name, parent) VALUES (" .. table.concat(valus, ", ") .. ");" );
+        else
+            insertCount = insertCount + 1;
         end
+
+        insert_stmt:step()
+        insert_stmt:reset()
     end
-    
-    if #sqlList > 0 then
-        sql = table.concat(sqlList, "");
-        loger.Debug("[util.dbwrite.InsertStock]sql=" .. sql);
-        local ret = DB:exec(sql);
-        loger.Debug("[util.dbwrite.InsertStock]ret=" .. tostring(ret));
-        inertCount = inertCount + #sqlList;
-    end
-    loger.Info("[util.dbwrite.InsertStock]inertCount=" .. inertCount);
+    DB:exec('commit');
+    insert_stmt:finalize();
+
+    loger.Info("[util.dbwrite.InsertStock]insertCount=" .. insertCount);
+    return insertCount;
 end
 
 
 function InsertDayTrend(dataList)
-    local sql;
-    local sqlList = {};
-    local item;
+    loger.Info("[util.dbwrite.InsertDayTrend]#dataList=" .. #dataList);
+
+    local item, ret;
+    local insertCount = 0;
+    local insert_stmt, msg = DB:prepare([[INSERT INTO daytrend(code, market, time, open_price, close_price, 
+ high_price, low_price, volnum) VALUES (?, ?, ?, ?, ?, ?, ?, ?)]]);
+
+    if type(insert_stmt) ~= "userdata" then
+        loger.Error("[util.dbwrite.InsertDayTrend]prepare sql faild.msg=" .. tostring(msg));
+        return;
+    end
+
+    DB:exec('begin');
     for idx = 1, #dataList do
         item = dataList[idx];
-        local valus = {
-            "'" .. item.code .. "'",
-            item.market,
-            item.time,
-            item.open_price,
-            item.close_price,
-            item.high_price,
-            item.low_price,
-            item.volnum,
-        };
+        ret = insert_stmt:bind_values(item.code, item.market, item.time, item.open_price, item.close_price, item.high_price,
+                item.low_price, item.volnum);
+        
+        if ret ~= sqlite3.OK then
+            local valus = {
+                "'" .. item.code .. "'",
+                item.market,
+                item.time,
+                item.open_price,
+                item.close_price,
+                item.high_price,
+                item.low_price,
+                item.volnum,
+            };
+            loger.Error("[util.dbwrite.InsertDayTrend]do insert failse.ret=" .. tostring(ret)
+                .. [[,INSERT INTO daytrend(code, market, time, open_price, close_price, 
+ high_price, low_price, volnum) VALUES (]] .. table.concat(valus, ", ") .. ");" );
+        else
+            insertCount = insertCount + 1;
+        end
 
-        sqlList[#sqlList + 1] = [[INSERT INTO daytrend(code, market, time, open_price, close_price, high_price, low_price, volnum) 
-            VALUES (]] .. table.concat(valus, ", ") .. ");";
+        insert_stmt:step()
+        insert_stmt:reset()
     end
-    sql = table.concat(sqlList, "");
+    DB:exec('commit');
+    insert_stmt:finalize();
+
+    loger.Info("[util.dbwrite.InsertDayTrend]insertCount=" .. insertCount);
+    return insertCount;
 end

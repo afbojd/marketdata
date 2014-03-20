@@ -1,5 +1,5 @@
 ---------------------------------
---! @file util/dbwrite.lua
+--! @file util/stockinit.lua
 --! @brief 证券信息初始化
 --!
 --! @author lontoken@gmail.com 
@@ -29,7 +29,7 @@ function StockInit(market)
                         ["code"] = item.code,
                         ["name"] = item.name,
                         ["jianpin"] = item.jianpin,
-                        ["market"] = marketId,
+                        ["market"] = item.market,
                     };
                 end
             end
@@ -41,7 +41,6 @@ function StockInit(market)
 
     loger.Debug("[datainit.stockinit.StockInit]stockList=" .. loger.GenTableStr(stockList));
     dbwrite.InsertStock(stockList);
-    stockCount = stockCount + #stockList;
 
-    return stockCount;
+    return stockList;
 end

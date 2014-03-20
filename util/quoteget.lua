@@ -143,8 +143,6 @@ function GetStockByMarket(marketList)
         return nil;
     end
 
-    --print(root:output());
-
     local stockList = {};
 
     local marketId;
@@ -159,7 +157,7 @@ function GetStockByMarket(marketList)
             ["stocks"] = stocks;
         };
 
-        local curTxt, idx;
+        local curTxt, idx, code, name, jianpin;
         for py in record:foreach_child() do
             local txt = py:get_text();
 
@@ -180,6 +178,7 @@ function GetStockByMarket(marketList)
                 ["code"] = code,
                 ["name"] = name,
                 ["jianpin"] = jianpin,
+                ["market"] = tonumber(curTxt),
             };
             stockCount = stockCount + 1;
         end
@@ -395,6 +394,8 @@ end
 --! @retval table {code = {market, trends = {{time, open_price, close_price, high_price, low_price, volnum}, ...}}, ... }，
 --      其中时间time格式为HHMMSS的5/6位整数
 function GetDayTrend(codeList, begTime, endTime)
+    loger.Info("[util.quoteget.GetDayTrend]#codeList=" .. #codeList);
+
     local codestr = "";
     begTime = begTime or 0;
     endTime = endTime or 0;
@@ -407,10 +408,12 @@ function GetDayTrend(codeList, begTime, endTime)
 
     for idx = 2, #codeList do
         item = codeList[idx];
-        codestr = ";" .. codestr .. item.market .. "(" .. item.code .. ")";
+        codestr = codestr .. ";" .. item.market .. "(" .. item.code .. ")";
     end
 
     local req = "Method=Quote&datetime=16384(" .. begTime .. "-" .. endTime .. ")&datatype=7,8,9,11,13&codelist=" .. codestr;
+
+    loger.Info("[util.quoteget.GetDayTrend]req=" .. req);
     local response, msg = hexin.util.httpRequest(HQURL, req);
 
     if type(response) ~= 'string' then
@@ -424,48 +427,91 @@ function GetDayTrend(codeList, begTime, endTime)
         return nil;
     end
 
+    --print("root:", root:output());
+
     local trendList = {};
     local id, value, marketId, quote, timeTab, trends, dealItem, code, codeIndex;
+    local trendCount = 0;
     for dataResult in root:foreach_child() do
         codeIndex = dataResult:get_child("CodeIndex");
 
         if codeIndex then
-            code = codeIndex:get_attr("Code");
-            marketId = tonumber(codeIndex:get_attr("Market"));
-        else
-            codeIndex = dataResult;
-        end
+            for codeIndex in dataResult:foreach_child() do
+                code = codeIndex:get_attr("Code");
+                marketId = tonumber(codeIndex:get_attr("Market"));
 
-        for record in codeIndex:foreach_child() do
-            trendItem = {};
-            for item in record:foreach_child() do
-                id = tonumber(item:get_attr("Id"));
+                for record in codeIndex:foreach_child() do
+                    trendItem = {};
+                    for item in record:foreach_child() do
+                        id = tonumber(item:get_attr("Id"));
 
-                value = item:get_child("Value"):get_text();
+                        value = item:get_child("Value"):get_text();
 
-                if id == QuoteKey_Time then
-                    trendItem["time"] = tonumber(value);
-                elseif id == QuoteKey_Code then
-                    code = value;
-                    marketId = tonumber(item:get_attr("Market"));
-                else
-                    trendItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
+                        --print(id, value);
+
+                        if id == QuoteKey_Time then
+                            trendItem["time"] = tonumber(value);
+                        elseif id == QuoteKey_Code then
+                            code = value;
+                            marketId = tonumber(item:get_attr("Market"));
+                        else
+                            trendItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
+                        end
+                        
+                    end
+
+                    if code then
+                        if not trendList[code] then
+                            trendList[code] = {
+                                market = marketId,
+                                trends = {},
+                            };
+                        end
+                        trends = trendList[code].trends;
+                        trends[#trends + 1] = trendItem;
+                        trendCount = trendCount + 1;
+                    end
                 end
-                
             end
+        else
+            for record in dataResult:foreach_child() do
+                trendItem = {};
+                for item in record:foreach_child() do
+                    id = tonumber(item:get_attr("Id"));
 
-            if not trendList[code] then
-                trendList[code] = {
-                    market = marketId,
-                    trends = {},
-                };
+                    value = item:get_child("Value"):get_text();
+
+                    --print(id, value);
+
+                    if id == QuoteKey_Time then
+                        trendItem["time"] = tonumber(value);
+                    elseif id == QuoteKey_Code then
+                        code = value;
+                        marketId = tonumber(item:get_attr("Market"));
+                    else
+                        trendItem[QuoteKeyRealTimeMap[id]] = tonumber(value);
+                    end
+                    
+                end
+
+                --print(loger.GenTableStr(trendItem));
+
+                if code then
+                    if not trendList[code] then
+                        trendList[code] = {
+                            market = marketId,
+                            trends = {},
+                        };
+                    end
+                    trends = trendList[code].trends;
+                    trends[#trends + 1] = trendItem;
+                    trendCount = trendCount + 1;
+                end
             end
-            trends = trendList[code].trends;
-            trends[#trends + 1] = trendItem;
         end
     end
 
-    loger.Debug("[util.quoteget.GetDayTrend]trendList=" .. loger.GenTableStr(trendList));
+    loger.Info("[util.quoteget.GetDayTrend]trendCount=" .. trendCount);
     return trendList;
 end
 

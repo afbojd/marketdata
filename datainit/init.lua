@@ -9,12 +9,16 @@ module('datainit.init', package.seeall);
 
 local mkinit = require("datainit.marketinit");
 local stinit = require("datainit.stockinit");
+local trinit = require("datainit.trendinit");
 local loger = require("util.loger");
 local quoteget = require("util.quoteget");
 
 function Init()
-    local marketList = mkinit.MarketInit();
+     local marketList = mkinit.MarketInit();
 
-    stinit.StockInit(quoteget.Market_SH);
-    stinit.StockInit(quoteget.Market_SZ);
+    local skListSH = stinit.StockInit(quoteget.Market_SH);
+    local skListSZ = stinit.StockInit(quoteget.Market_SZ);
+
+    trinit.DayTrendInit(skListSH);
+    trinit.DayTrendInit(skListSZ);
 end
