@@ -7,6 +7,11 @@
 -------------------------------------------------------------------------------
 module('util.loger', package.seeall);
 
+
+local LogerFile = assert(io.open("log.log", "a"));
+
+
+
 function GenTableStr (tbl)
     local msgstr;
     for k, v in pairs(tbl) do
@@ -29,17 +34,19 @@ function GenTableStr (tbl)
 end
 
 function Debug(...)
-    --print(...);
+    --LogerFile:write(..., "\n");
 end
 
 function Info(...)
-    print(...);
+    LogerFile:write(..., "\n");
 end
 
 function Warn(...)
+    LogerFile:write(..., "\n");
     print(...);
 end
 
 function Error(...)
+    LogerFile:write(..., "\n");
     print(...);
 end

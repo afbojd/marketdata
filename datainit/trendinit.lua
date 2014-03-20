@@ -10,6 +10,7 @@ module('datainit.trendinit', package.seeall);
 local quoteget = require("util.quoteget");
 local dbwrite = require("util.dbwrite");
 local loger = require("util.loger");
+local dbread = require("util.dbread");
 
 local StockList = {
     {code ="600570", market = 17},
@@ -20,6 +21,8 @@ local StockList = {
 function DayTrendInit(stockList)
     loger.Info("[datainit.trendinit.DayTrendInit]#stockList=" .. #stockList);
 
+    local codeListDb = dbread.GetDayTrendCodeFromDB();
+
     local item;
     local idx = 1;
     local skList = {};
@@ -27,7 +30,12 @@ function DayTrendInit(stockList)
     while idx <= #stockList do
         item = stockList[idx];
 
-        skList[#skList + 1] = item;
+        if codeListDb[item.code] then
+            loger.Debug("[datainit.trendinit.DayTrendInit]db already has the data. code=" .. item.code .. ",count=" .. codeListDb[item.code]);
+        else
+            skList[#skList + 1] = item;
+        end
+
         if #skList == 10 or idx == #stockList then
             local trendData = quoteget.GetDayTrend(skList);
 
